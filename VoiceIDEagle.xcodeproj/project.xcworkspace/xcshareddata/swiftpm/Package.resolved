@@ -1,5 +1,5 @@
 {
-  "originHash" : "8a533e55c51722f158250dc758faf5edc9dbdaa3dbde0f3e47f7e7cd8f8c7034",
+  "originHash" : "9781bf9c1c13c3ee37d7a6ed8617e51cf810eae99b6df6a309f3bbe64db42119",
   "pins" : [
     {
       "identity" : "eagle",
@@ -8,6 +8,15 @@
       "state" : {
         "revision" : "6cdd0b74af3cf90e4406cd0a4acccbfe6f712b08",
         "version" : "3.0.1"
+      }
+    },
+    {
+      "identity" : "falcon",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/Picovoice/falcon.git",
+      "state" : {
+        "revision" : "c77035779163ca4d8b5b46aa889fd375d517d160",
+        "version" : "2.0.0"
       }
     }
   ],

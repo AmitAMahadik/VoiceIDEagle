@@ -27,13 +27,22 @@ final class RecognitionViewModel: ObservableObject {
 
     init(profileStore: SpeakerProfileStore,
          permissionService: MicrophonePermissionService,
-         recognitionService: EagleRecognitionService = EagleRecognitionService()) {
+         recognitionService: EagleRecognitionService) {
         self.profileStore = profileStore
         self.permissionService = permissionService
         self.recognitionService = recognitionService
 
         let saved = UserDefaults.standard.float(forKey: AppConfig.identificationThresholdKey)
         self.threshold = saved == 0 ? AppConfig.defaultIdentificationThreshold : saved
+    }
+
+    convenience init(profileStore: SpeakerProfileStore,
+                     permissionService: MicrophonePermissionService) {
+        self.init(
+            profileStore: profileStore,
+            permissionService: permissionService,
+            recognitionService: EagleRecognitionService()
+        )
     }
 
     // MARK: - Controls
@@ -118,14 +127,14 @@ final class RecognitionViewModel: ObservableObject {
                 do {
                     let scores = try recognitionService.processFrame(frame)
                     let orderedProfiles = recognitionService.profilesInOrder
-                    Task { @MainActor in
+                    Task { @MainActor [weak self] in
                         self?.applyScores(scores, profiles: orderedProfiles)
                     }
                 } catch let error as AppError {
-                    Task { @MainActor in self?.fail(error) }
+                    Task { @MainActor [weak self] in self?.fail(error) }
                 } catch {
                     let message = error.localizedDescription
-                    Task { @MainActor in
+                    Task { @MainActor [weak self] in
                         self?.fail(.recognitionFailed(message))
                     }
                 }
@@ -203,7 +212,4 @@ final class RecognitionViewModel: ObservableObject {
         alertMessage = error.errorDescription
     }
 
-    deinit {
-        audioCapture?.stop()
-    }
 }

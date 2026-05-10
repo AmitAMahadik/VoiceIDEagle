@@ -125,4 +125,3 @@ final class EagleRecognitionService: @unchecked Sendable {
         eagle = nil
     }
 }
-

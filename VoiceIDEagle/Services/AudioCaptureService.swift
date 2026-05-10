@@ -78,6 +78,11 @@ final class AudioCaptureService: @unchecked Sendable {
         audioEngine.stop()
         isRunning = false
 
+        // Drain any frame deliveries that the audio thread already enqueued
+        // so they finish using the current handler before we clear it. The
+        // empty `queue.sync {}` blocks until pending tasks complete.
+        queue.sync {}
+
         lock.lock()
         pendingSamples.removeAll(keepingCapacity: false)
         frameHandler = nil
@@ -94,7 +99,7 @@ final class AudioCaptureService: @unchecked Sendable {
         do {
             try session.setCategory(.playAndRecord,
                                     mode: .measurement,
-                                    options: [.defaultToSpeaker, .allowBluetooth])
+                                    options: [.defaultToSpeaker, .allowBluetoothHFP])
             try session.setPreferredSampleRate(targetSampleRate)
             try session.setActive(true, options: [])
         } catch {

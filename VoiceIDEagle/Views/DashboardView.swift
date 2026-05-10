@@ -82,6 +82,19 @@ struct DashboardView: View {
             .disabled(!viewModel.sdkReady)
 
             NavigationLink {
+                DiarizationView(
+                    profileStore: viewModel.profileStore,
+                    permissionService: viewModel.permissionService
+                )
+            } label: {
+                buttonLabel(title: "Diarize Speakers", systemImage: "person.wave.2")
+            }
+            .buttonStyle(.borderedProminent)
+            .controlSize(.large)
+            .tint(.purple)
+            .disabled(!viewModel.sdkReady)
+
+            NavigationLink {
                 ProfileManagementView(profileStore: viewModel.profileStore)
             } label: {
                 buttonLabel(title: "Manage Profiles", systemImage: "person.2.gobackward")

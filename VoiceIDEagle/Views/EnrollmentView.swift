@@ -37,6 +37,7 @@ struct EnrollmentView: View {
             message: { Text(viewModel.alertMessage ?? "") }
         )
         .interactiveDismissDisabled(viewModel.step == .capturing)
+        .onDisappear { viewModel.cancel() }
     }
 
     // MARK: - Steps

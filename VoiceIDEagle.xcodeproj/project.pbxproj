@@ -9,6 +9,7 @@
 /* Begin PBXBuildFile section */
 		BC19EB722FAFCB2300956ED6 /* Eagle in Frameworks */ = {isa = PBXBuildFile; productRef = BC19EB712FAFCB2300956ED6 /* Eagle */; };
 		BC19EB762FB02DFF00956ED6 /* .gitignore in Resources */ = {isa = PBXBuildFile; fileRef = BC19EB752FB02DFF00956ED6 /* .gitignore */; };
+		BC19EB832FB0376500956ED6 /* Falcon in Frameworks */ = {isa = PBXBuildFile; productRef = BC19EB822FB0376500956ED6 /* Falcon */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -30,6 +31,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				BC19EB722FAFCB2300956ED6 /* Eagle in Frameworks */,
+				BC19EB832FB0376500956ED6 /* Falcon in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -74,6 +76,7 @@
 			name = VoiceIDEagle;
 			packageProductDependencies = (
 				BC19EB712FAFCB2300956ED6 /* Eagle */,
+				BC19EB822FB0376500956ED6 /* Falcon */,
 			);
 			productName = VoiceIDEagle;
 			productReference = BC19EB212FAFC9E200956ED6 /* VoiceIDEagle.app */;
@@ -105,6 +108,7 @@
 			minimizedProjectReferenceProxies = 1;
 			packageReferences = (
 				BC19EB702FAFCB2300956ED6 /* XCRemoteSwiftPackageReference "eagle" */,
+				BC19EB812FB0376500956ED6 /* XCRemoteSwiftPackageReference "falcon" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = BC19EB222FAFC9E200956ED6 /* Products */;
@@ -357,6 +361,14 @@
 				minimumVersion = 3.0.1;
 			};
 		};
+		BC19EB812FB0376500956ED6 /* XCRemoteSwiftPackageReference "falcon" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/Picovoice/falcon.git";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 2.0.0;
+			};
+		};
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
@@ -364,6 +376,11 @@
 			isa = XCSwiftPackageProductDependency;
 			package = BC19EB702FAFCB2300956ED6 /* XCRemoteSwiftPackageReference "eagle" */;
 			productName = Eagle;
+		};
+		BC19EB822FB0376500956ED6 /* Falcon */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = BC19EB812FB0376500956ED6 /* XCRemoteSwiftPackageReference "falcon" */;
+			productName = Falcon;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};

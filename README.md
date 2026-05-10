@@ -1,10 +1,11 @@
 # VoiceID Eagle
 
-On-device speaker enrollment and identification for iOS, built with **SwiftUI**, **AVAudioEngine**, and the **Picovoice Eagle iOS SDK**.
+On-device speaker enrollment, identification, and diarization for iOS, built with **SwiftUI**, **AVAudioEngine**, and the Picovoice **Eagle** + **Falcon** iOS SDKs.
 
 - iOS 17+ · Swift 5.9+ · SwiftUI · MVVM
 - 100% on-device. No backend. No raw audio is uploaded or stored.
 - Local-only persistence of Eagle profiles in the app's Application Support directory.
+- Eagle for speaker enrollment + live identification, Falcon for diarization with optional Eagle name-tagging on top.
 
 ## Project layout
 
@@ -20,11 +21,14 @@ VoiceIDEagle/
 │   │   ├── SpeakerProfile.swift
 │   │   ├── SpeakerScore.swift
 │   │   ├── RecognitionState.swift
-│   │   └── EnrollmentState.swift
+│   │   ├── EnrollmentState.swift
+│   │   └── DiarizedSegment.swift
 │   ├── Services/
 │   │   ├── EagleEnrollmentService.swift
 │   │   ├── EagleRecognitionService.swift
+│   │   ├── EagleSegmentClassifier.swift
 │   │   ├── EagleProfileBytesAdapter.swift
+│   │   ├── FalconDiarizationService.swift
 │   │   ├── AudioCaptureService.swift
 │   │   ├── SpeakerProfileStore.swift
 │   │   └── MicrophonePermissionService.swift
@@ -32,11 +36,13 @@ VoiceIDEagle/
 │   │   ├── DashboardViewModel.swift
 │   │   ├── EnrollmentViewModel.swift
 │   │   ├── RecognitionViewModel.swift
+│   │   ├── DiarizationViewModel.swift
 │   │   └── ProfileManagementViewModel.swift
 │   ├── Views/
 │   │   ├── DashboardView.swift
 │   │   ├── EnrollmentView.swift
 │   │   ├── RecognitionView.swift
+│   │   ├── DiarizationView.swift
 │   │   ├── ProfileManagementView.swift
 │   │   └── Components/
 │   │       ├── StatusCardView.swift
@@ -62,16 +68,19 @@ VoiceIDEagle/
 4. Delete the auto-generated `ContentView.swift` and `VoiceIDEagleApp.swift` (we provide our own).
 5. **File → Add Files to "VoiceIDEagle"** and add every folder from `VoiceIDEagle/VoiceIDEagle/`. Use **"Create folder references"** (or groups) — make sure "Copy items if needed" is **off** if your Xcode project shares the directory with the source files, otherwise on.
 
-### 2. Add the Picovoice Eagle SDK (Swift Package Manager)
+### 2. Add the Picovoice SDKs (Swift Package Manager)
+
+The app links two Picovoice products. Both ship as Swift Packages and share a single AccessKey.
 
 1. In Xcode: **File → Add Packages…**
-2. Enter the repository URL:
+2. Add each repository, selecting the named product when prompted:
 
-   ```
-   https://github.com/Picovoice/eagle.git
-   ```
+   | Repository | Product | Used for |
+   | --- | --- | --- |
+   | `https://github.com/Picovoice/eagle.git` | `Eagle` | enrollment, identification, segment classification |
+   | `https://github.com/Picovoice/falcon.git` | `Falcon` | speaker diarization |
 
-3. Select the `Eagle` Swift Package and add it to the **VoiceIDEagle** target.
+3. Both packages must be added to the **VoiceIDEagle** target.
 
 ### 3. Configure the Picovoice AccessKey
 
@@ -130,12 +139,29 @@ Build and run on a real device. The simulator can run the app, but speaker recog
 6. The highest-scoring speaker becomes the **best match** if their score is at or above the user-configurable identification threshold (default `0.65`, stored in `UserDefaults`); otherwise the UI shows **Unknown Speaker**.
 7. `eagle.reset()` is called when the user taps **Reset Session**. `eagle.delete()` is called when listening stops.
 
+## How diarization works
+
+Falcon is **batch** — its iOS API consumes a complete PCM buffer in one call and returns all detected segments at once. So the diarization screen records first, then analyzes:
+
+1. The user taps **Start Recording**. `FalconDiarizationService.start()` initializes Falcon (catches activation errors before recording starts).
+2. The shared `AudioCaptureService` taps the microphone at `Falcon.sampleRate` (16 kHz mono Int16). Every frame is appended to a thread-safe `CaptureBuffer` inside the view model.
+3. The user taps **Stop & Analyze** (or the 5-minute auto-stop fires). The buffer is drained.
+4. Falcon's `process(_:)` returns `[FalconSegment]` — each with a `startSec`, `endSec`, and an anonymous integer `speakerTag`.
+5. The view model groups the captured PCM by `speakerTag`. For each tag's PCM, `EagleSegmentClassifier.classify(pcm:)` spins up a fresh `Eagle` instance, walks the buffer in `minProcessSamples()`-sized chunks, and averages the score frames it gets back. A fresh `Eagle` per tag prevents the SDK's accumulated voice context from one tag leaking into the next.
+6. Per-tag averaged score vectors are kept in the view model. Each segment's display name is resolved live from those scores against the identification threshold:
+   - Score ≥ threshold → matched profile's name + confidence badge.
+   - Otherwise → fall back to **Speaker N** (where `N = speakerTag + 1`).
+7. The threshold slider re-labels segments instantly without re-running the pipeline.
+
+If there are no enrolled profiles, the Eagle stage is skipped entirely and every turn shows as Speaker 1, 2, ….
+
 ## Architecture
 
 - **MVVM**. View models are `@MainActor`-isolated and publish state via Combine `@Published` properties.
 - **Services** (`Eagle*Service`, `AudioCaptureService`, `SpeakerProfileStore`, `MicrophonePermissionService`) own all I/O, audio, and SDK lifecycles.
 - **Eagle work runs off the main thread.** `Task.detached(priority: .userInitiated)` hands every frame to a serial dispatch queue inside the Eagle services, then jumps back to the main actor only for state mutation.
 - **Profile bytes serialization** is isolated in `EagleProfileBytesAdapter`. If a future Eagle SDK version renames `getBytes()` / `init(bytes:)`, that file is the only place to update.
+- **Maximum reuse across SDKs.** `AudioCaptureService`, `PCMConverter`, `MicrophonePermissionService`, `EnvironmentLoader`/`AppConfig`, and the SwiftUI components all serve Eagle and Falcon equally. The diarization stack adds one new SDK service (`FalconDiarizationService`), one batch Eagle adapter (`EagleSegmentClassifier`), one model (`DiarizedSegment`), one view model, and one view.
 
 ## Privacy
 
@@ -157,6 +183,9 @@ Build and run on a real device. The simulator can run the app, but speaker recog
 | Build error: `cannot find 'Eagle' in scope` | The `Eagle` Swift Package was not added to the target. Re-do **File → Add Packages…**. |
 | Build error: `value of type 'EagleProfile' has no member 'getBytes'` | Your installed Eagle SDK version uses a different serialization API. Update `EagleProfileBytesAdapter.swift` — only that file needs to change. |
 | Build error: `extra argument 'speakerProfiles' in call` (against `Eagle.init`) | Older SDK shape. Move the profiles into `Eagle.init(...)` and remove `speakerProfiles:` from the `process(pcm:)` call inside `EagleRecognitionService.swift`. |
+| Build error: `cannot find 'Falcon' in scope` | The `Falcon` Swift Package was not added to the target. Re-do **File → Add Packages…** with `https://github.com/Picovoice/falcon.git`. |
+| Diarization "found no speaker segments" | Falcon needs a few seconds of clearly-voiced audio. Try a longer recording in a quieter room. |
+| Every diarized segment is "Speaker N" even though voices are enrolled | Lower the identification threshold from the Diarize screen, or re-enroll the speaker — Falcon segments are short and may not score as high as long live audio. |
 
 ## Configuration reference
 
@@ -166,6 +195,7 @@ Build and run on a real device. The simulator can run the app, but speaker recog
 | Identification threshold | `UserDefaults` key `identificationThreshold`, exposed in the Identify screen slider | `0.65` |
 | Eagle voice threshold | `AppConfig.voiceThreshold` | `0.3` |
 | Smoothing window | `RecognitionViewModel.smoothingWindow` | `5` frames |
+| Max diarization recording length | `DiarizationViewModel.maxRecordingSec` | `300` s (5 min) |
 
 ## License
 

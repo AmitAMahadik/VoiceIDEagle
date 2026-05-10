@@ -24,10 +24,19 @@ final class EnrollmentViewModel: ObservableObject {
 
     init(profileStore: SpeakerProfileStore,
          permissionService: MicrophonePermissionService,
-         enrollmentService: EagleEnrollmentService = EagleEnrollmentService()) {
+         enrollmentService: EagleEnrollmentService) {
         self.profileStore = profileStore
         self.permissionService = permissionService
         self.enrollmentService = enrollmentService
+    }
+
+    convenience init(profileStore: SpeakerProfileStore,
+                     permissionService: MicrophonePermissionService) {
+        self.init(
+            profileStore: profileStore,
+            permissionService: permissionService,
+            enrollmentService: EagleEnrollmentService()
+        )
     }
 
     // MARK: - Step transitions
@@ -108,10 +117,10 @@ final class EnrollmentViewModel: ObservableObject {
                         }
                     }
                 } catch let error as AppError {
-                    Task { @MainActor in self?.fail(error) }
+                    Task { @MainActor [weak self] in self?.fail(error) }
                 } catch {
                     let message = error.localizedDescription
-                    Task { @MainActor in
+                    Task { @MainActor [weak self] in
                         self?.fail(.enrollmentFailed(message))
                     }
                 }
@@ -177,9 +186,4 @@ final class EnrollmentViewModel: ObservableObject {
         }
     }
 
-    deinit {
-        // Ensure resources are released even if the view goes away mid-flow.
-        audioCapture?.stop()
-        // enrollmentService handles its own cleanup in deinit.
-    }
 }
