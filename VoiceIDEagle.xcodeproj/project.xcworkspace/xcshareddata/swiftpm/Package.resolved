@@ -1,0 +1,15 @@
+{
+  "originHash" : "8a533e55c51722f158250dc758faf5edc9dbdaa3dbde0f3e47f7e7cd8f8c7034",
+  "pins" : [
+    {
+      "identity" : "eagle",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/Picovoice/eagle.git",
+      "state" : {
+        "revision" : "6cdd0b74af3cf90e4406cd0a4acccbfe6f712b08",
+        "version" : "3.0.1"
+      }
+    }
+  ],
+  "version" : 3
+}

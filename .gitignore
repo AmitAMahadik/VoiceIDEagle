@@ -1,0 +1,28 @@
+# Secrets
+.env
+**/.env
+
+# Keep sample env files in source control
+!.env.example
+!**/.env.example
+
+# Xcode user-specific files
+xcuserdata/
+*.xcuserstate
+*.xcscmblueprint
+
+# Build artifacts
+DerivedData/
+build/
+*.ipa
+
+# Swift Package Manager
+.swiftpm/
+.build/
+
+# CocoaPods / Carthage (uncomment if used)
+# Pods/
+# Carthage/Build/
+
+# macOS
+.DS_Store

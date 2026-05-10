@@ -6,8 +6,14 @@
 	objectVersion = 77;
 	objects = {
 
+/* Begin PBXBuildFile section */
+		BC19EB722FAFCB2300956ED6 /* Eagle in Frameworks */ = {isa = PBXBuildFile; productRef = BC19EB712FAFCB2300956ED6 /* Eagle */; };
+		BC19EB762FB02DFF00956ED6 /* .gitignore in Resources */ = {isa = PBXBuildFile; fileRef = BC19EB752FB02DFF00956ED6 /* .gitignore */; };
+/* End PBXBuildFile section */
+
 /* Begin PBXFileReference section */
 		BC19EB212FAFC9E200956ED6 /* VoiceIDEagle.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = VoiceIDEagle.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		BC19EB752FB02DFF00956ED6 /* .gitignore */ = {isa = PBXFileReference; lastKnownFileType = text; path = .gitignore; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
@@ -23,6 +29,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				BC19EB722FAFCB2300956ED6 /* Eagle in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -34,6 +41,7 @@
 			children = (
 				BC19EB232FAFC9E200956ED6 /* VoiceIDEagle */,
 				BC19EB222FAFC9E200956ED6 /* Products */,
+				BC19EB752FB02DFF00956ED6 /* .gitignore */,
 			);
 			sourceTree = "<group>";
 		};
@@ -65,6 +73,7 @@
 			);
 			name = VoiceIDEagle;
 			packageProductDependencies = (
+				BC19EB712FAFCB2300956ED6 /* Eagle */,
 			);
 			productName = VoiceIDEagle;
 			productReference = BC19EB212FAFC9E200956ED6 /* VoiceIDEagle.app */;
@@ -94,6 +103,9 @@
 			);
 			mainGroup = BC19EB182FAFC9E200956ED6;
 			minimizedProjectReferenceProxies = 1;
+			packageReferences = (
+				BC19EB702FAFCB2300956ED6 /* XCRemoteSwiftPackageReference "eagle" */,
+			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = BC19EB222FAFC9E200956ED6 /* Products */;
 			projectDirPath = "";
@@ -109,6 +121,7 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				BC19EB762FB02DFF00956ED6 /* .gitignore in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -256,6 +269,7 @@
 				DEVELOPMENT_TEAM = VHYDM4DE58;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_NSMicrophoneUsageDescription = "Need mic for ID";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
@@ -288,6 +302,7 @@
 				DEVELOPMENT_TEAM = VHYDM4DE58;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_NSMicrophoneUsageDescription = "Need mic for ID";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
@@ -332,6 +347,25 @@
 			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */
+
+/* Begin XCRemoteSwiftPackageReference section */
+		BC19EB702FAFCB2300956ED6 /* XCRemoteSwiftPackageReference "eagle" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/Picovoice/eagle.git";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 3.0.1;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		BC19EB712FAFCB2300956ED6 /* Eagle */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = BC19EB702FAFCB2300956ED6 /* XCRemoteSwiftPackageReference "eagle" */;
+			productName = Eagle;
+		};
+/* End XCSwiftPackageProductDependency section */
 	};
 	rootObject = BC19EB192FAFC9E200956ED6 /* Project object */;
 }
