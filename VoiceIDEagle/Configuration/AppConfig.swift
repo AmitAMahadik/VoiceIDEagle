@@ -30,4 +30,7 @@ enum AppConfig {
     /// app-level identification threshold; controls how aggressively Eagle
     /// emits scores when there is little voice activity.
     static let voiceThreshold: Float = 0.3
+
+    /// Minimum speaking time required before enrollment can complete.
+    static let minEnrollmentDurationSec: TimeInterval = 8
 }

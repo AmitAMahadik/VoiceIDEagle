@@ -5,29 +5,37 @@ struct DashboardView: View {
 
     var body: some View {
         NavigationStack {
-            ScrollView {
-                VStack(spacing: 24) {
-                    header
+            VStack(spacing: 14) {
+                header
 
-                    StatusCardView(
-                        permissionStatus: viewModel.permissionStatus,
-                        profileCount: viewModel.profileCount,
-                        sdkReady: viewModel.sdkReady
-                    )
+                StatusCardView(
+                    permissionStatus: viewModel.permissionStatus,
+                    profileCount: viewModel.profileCount,
+                    eagleReady: viewModel.eagleReady,
+                    falconReady: viewModel.falconReady
+                )
 
-                    if let configurationError = viewModel.configurationError {
-                        configurationBanner(configurationError)
-                    }
-
-                    actionButtons
-
-                    privacyNote
+                if let configurationError = viewModel.configurationError {
+                    configurationBanner(configurationError)
                 }
-                .padding(.horizontal, 20)
-                .padding(.vertical, 16)
+
+                actionButtons
+
+                privacyNote
             }
-            .navigationTitle("VoiceID Eagle")
+            .padding(.horizontal, 20)
+            .padding(.vertical, 10)
+            .navigationBarTitleDisplayMode(.inline)
             .toolbar {
+                ToolbarItem(placement: .principal) {
+                    HStack(spacing: 6) {
+                        Image(systemName: "waveform")
+                            .font(.system(size: 34, weight: .regular))
+                        Text("VoiceID")
+                            .font(.system(size: 34, weight: .semibold))
+                    }
+                    .foregroundStyle(.primary)
+                }
                 ToolbarItem(placement: .topBarTrailing) {
                     Button {
                         viewModel.refresh()
@@ -42,16 +50,12 @@ struct DashboardView: View {
     }
 
     private var header: some View {
-        VStack(spacing: 8) {
-            Image(systemName: "waveform")
-                .font(.system(size: 44, weight: .light))
-                .foregroundStyle(Color.accentColor)
-            Text("On-device speaker recognition")
-                .font(.subheadline)
-                .foregroundStyle(.secondary)
-        }
+        Text("On-device speaker identification and diarization")
+            .font(.subheadline)
+            .foregroundStyle(.secondary)
+            .multilineTextAlignment(.center)
         .frame(maxWidth: .infinity)
-        .padding(.top, 8)
+        .padding(.top, 2)
     }
 
     private var actionButtons: some View {
@@ -110,7 +114,7 @@ struct DashboardView: View {
             Text(title).fontWeight(.semibold)
         }
         .frame(maxWidth: .infinity)
-        .padding(.vertical, 14)
+        .padding(.vertical, 10)
     }
 
     private var privacyNote: some View {
@@ -121,7 +125,7 @@ struct DashboardView: View {
                 .font(.footnote)
                 .foregroundStyle(.secondary)
         }
-        .padding(14)
+        .padding(10)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(
             RoundedRectangle(cornerRadius: 12, style: .continuous)
@@ -138,7 +142,7 @@ struct DashboardView: View {
                 Text(message).font(.footnote).foregroundStyle(.secondary)
             }
         }
-        .padding(14)
+        .padding(10)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(
             RoundedRectangle(cornerRadius: 12, style: .continuous)
@@ -150,4 +154,3 @@ struct DashboardView: View {
 #Preview {
     DashboardView()
 }
-

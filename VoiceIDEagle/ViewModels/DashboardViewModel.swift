@@ -8,6 +8,8 @@ final class DashboardViewModel: ObservableObject {
     @Published var profileCount: Int = 0
     @Published var permissionStatus: MicrophonePermissionService.Status = .undetermined
     @Published var sdkReady: Bool = false
+    @Published var eagleReady: Bool = false
+    @Published var falconReady: Bool = false
     @Published var configurationError: String?
 
     let permissionService: MicrophonePermissionService
@@ -52,10 +54,42 @@ final class DashboardViewModel: ObservableObject {
         if AppConfig.picovoiceAccessKeyIfPresent == nil {
             configurationError = AppError.missingAccessKey.errorDescription
             sdkReady = false
+            eagleReady = false
+            falconReady = false
         } else {
             configurationError = nil
-            sdkReady = true
+
+            var eagleError: AppError?
+            var falconError: AppError?
+
+            let eagleService = EagleEnrollmentService()
+            do {
+                try eagleService.start()
+                eagleReady = true
+            } catch let error as AppError {
+                eagleReady = false
+                eagleError = error
+            } catch {
+                eagleReady = false
+                eagleError = .eagleInitializationFailed(error.localizedDescription)
+            }
+            eagleService.stop()
+
+            let falconService = FalconDiarizationService()
+            do {
+                try falconService.start()
+                falconReady = true
+            } catch let error as AppError {
+                falconReady = false
+                falconError = error
+            } catch {
+                falconReady = false
+                falconError = .falconInitializationFailed(error.localizedDescription)
+            }
+            falconService.stop()
+
+            sdkReady = eagleReady && falconReady
+            configurationError = eagleError?.errorDescription ?? falconError?.errorDescription
         }
     }
 }
-

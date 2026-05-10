@@ -21,6 +21,8 @@ final class EnrollmentViewModel: ObservableObject {
     private let permissionService: MicrophonePermissionService
     private let enrollmentService: EagleEnrollmentService
     private var audioCapture: AudioCaptureService?
+    private var captureStartTime: Date?
+    private var isCompletingEnrollment = false
 
     init(profileStore: SpeakerProfileStore,
          permissionService: MicrophonePermissionService,
@@ -60,6 +62,8 @@ final class EnrollmentViewModel: ObservableObject {
     func cancel() {
         stopAudioCapture()
         enrollmentService.stop()
+        captureStartTime = nil
+        isCompletingEnrollment = false
         state = .idle
         step = .nameEntry
     }
@@ -67,6 +71,8 @@ final class EnrollmentViewModel: ObservableObject {
     func reset() {
         stopAudioCapture()
         enrollmentService.reset()
+        captureStartTime = nil
+        isCompletingEnrollment = false
         state = .idle
         step = .instructions
     }
@@ -110,10 +116,22 @@ final class EnrollmentViewModel: ObservableObject {
                     let percent = try enrollmentService.processFrame(frame)
                     Task { @MainActor in
                         guard let self else { return }
-                        if percent >= 100 {
+                        let elapsed = Date().timeIntervalSince(self.captureStartTime ?? .distantPast)
+                        let minimumMet = elapsed >= AppConfig.minEnrollmentDurationSec
+                        if percent >= 100, minimumMet, !self.isCompletingEnrollment {
+                            self.isCompletingEnrollment = true
                             await self.completeEnrollment()
                         } else {
-                            self.state = .enrolling(percent: Double(percent))
+                            // Before minimum duration is met, show time-based
+                            // progress so the UI continues to move naturally.
+                            let timePercent = Float(
+                                min(
+                                    max(elapsed / AppConfig.minEnrollmentDurationSec, 0),
+                                    0.99
+                                ) * 100
+                            )
+                            let displayed = minimumMet ? percent : timePercent
+                            self.state = .enrolling(percent: Double(displayed))
                         }
                     }
                 } catch let error as AppError {
@@ -135,6 +153,8 @@ final class EnrollmentViewModel: ObservableObject {
 
         state = .listening
         step = .capturing
+        captureStartTime = Date()
+        isCompletingEnrollment = false
     }
 
     private func completeEnrollment() async {
@@ -153,6 +173,7 @@ final class EnrollmentViewModel: ObservableObject {
         }
 
         enrollmentService.stop()
+        captureStartTime = nil
 
         let profile = SpeakerProfile(name: name, profileData: bytes)
         profileStore.saveProfile(profile)
@@ -163,11 +184,13 @@ final class EnrollmentViewModel: ObservableObject {
     }
 
     private func fail(_ error: AppError) {
-        // Ignore late-arriving frame errors after we've already completed.
-        if step == .finished { return }
+        // Ignore late frame errors once enrollment is no longer actively capturing.
+        guard step == .capturing else { return }
         if case .complete = state { return }
         stopAudioCapture()
         enrollmentService.stop()
+        captureStartTime = nil
+        isCompletingEnrollment = false
         state = .failed(error.errorDescription ?? "Unknown error")
         alertMessage = error.errorDescription
     }

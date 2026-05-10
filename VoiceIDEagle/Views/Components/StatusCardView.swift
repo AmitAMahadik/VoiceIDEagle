@@ -3,7 +3,8 @@ import SwiftUI
 struct StatusCardView: View {
     let permissionStatus: MicrophonePermissionService.Status
     let profileCount: Int
-    let sdkReady: Bool
+    let eagleReady: Bool
+    let falconReady: Bool
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
@@ -22,10 +23,10 @@ struct StatusCardView: View {
             )
             Divider()
             row(
-                icon: sdkReady ? "checkmark.seal" : "exclamationmark.triangle",
-                title: "Eagle SDK",
-                value: sdkReady ? "Ready" : "Not configured",
-                tint: sdkReady ? .green : .orange
+                icon: (eagleReady && falconReady) ? "checkmark.seal" : "exclamationmark.triangle",
+                title: "SDKs",
+                value: sdkSummary,
+                tint: (eagleReady && falconReady) ? .green : .orange
             )
         }
         .padding(20)
@@ -67,5 +68,9 @@ struct StatusCardView: View {
         case .denied:       return .red
         case .granted:      return .green
         }
+    }
+
+    private var sdkSummary: String {
+        "Eagle \(eagleReady ? "✓" : "✕")   Falcon \(falconReady ? "✓" : "✕")"
     }
 }
