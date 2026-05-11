@@ -6,6 +6,7 @@ On-device speaker enrollment, identification, and diarization for iOS, built wit
 - 100% on-device. No backend. No raw audio is uploaded or stored.
 - Local-only persistence of Eagle profiles in the app's Application Support directory.
 - Eagle for speaker enrollment + live identification, Falcon for diarization with optional Eagle name-tagging on top.
+- Both SDKs share a single Picovoice AccessKey loaded from a bundled `.env`.
 
 ## Project layout
 
@@ -112,7 +113,7 @@ In the target's **Info** tab (or `Info.plist`) add:
 
 | Key | Value |
 | --- | --- |
-| `NSMicrophoneUsageDescription` (Privacy – Microphone Usage Description) | `VoiceID Eagle uses the microphone to enroll and identify speakers entirely on-device.` |
+| `NSMicrophoneUsageDescription` (Privacy – Microphone Usage Description) | `VoiceIDEagle uses the microphone to enroll, identify, and diarize speakers entirely on-device.` |
 
 Without this key, the OS will terminate the app on first microphone access.
 
@@ -120,24 +121,31 @@ Without this key, the OS will terminate the app on first microphone access.
 
 Build and run on a real device. The simulator can run the app, but speaker recognition quality on simulator audio paths is not representative of real device behavior.
 
+## Startup SDK readiness check
+
+The dashboard verifies both SDKs at app launch (and on the toolbar refresh button). `DashboardViewModel.evaluateConfiguration()` instantiates `EagleEnrollmentService` and `FalconDiarizationService` long enough to call their `start()` / `stop()` lifecycle — that round-trip catches activation errors (refused / throttled / limit reached) before the user navigates to any feature. The result populates `eagleReady` and `falconReady` on the view model, which `StatusCardView` renders as a single **SDKs** row reading `Eagle ✓   Falcon ✓` (or `✕` per SDK). All four action buttons are gated on the derived `sdkReady = eagleReady && falconReady`.
+
+The probe runs on the main actor for simplicity — both SDK `init()` calls are quick — and the latest error message is surfaced via the configuration banner below the status card.
+
 ## How enrollment works
 
 1. The user enters a display name.
 2. `EagleProfiler` is initialized with the AccessKey from `.env`.
 3. `AudioCaptureService` taps the microphone via `AVAudioEngine` and resamples to `Eagle.sampleRate` mono 16-bit PCM.
-4. Frames of length `EagleProfiler.frameLength` are fed to `enroll(pcm:)` until the percentage reaches 100.
-5. `EagleProfiler.export()` returns an `EagleProfile`. We serialize the bytes via `EagleProfileBytesAdapter` and persist them, with the speaker's name and creation date, to a JSON file in the Application Support directory.
-6. The profiler is destroyed (`delete()`), the audio engine is stopped, and resources are released.
+4. Frames of length `EagleProfiler.frameLength` are fed to `enroll(pcm:)`. Enrollment completes when **both** conditions are true: Eagle reports `>=` 100% **and** at least `AppConfig.minEnrollmentDurationSec` seconds of audio have been captured (default 8 s). Without the duration floor a strong, close-mic speaker can hit 100% in a couple of seconds, which produces brittle profiles.
+5. Until the minimum duration is met, the progress ring shows **time-based** progress (`elapsed / minEnrollmentDurationSec`) so the UI keeps moving smoothly. After that, it switches to Eagle's actual percentage.
+6. On completion, `EagleProfiler.export()` returns an `EagleProfile`. We serialize the bytes via `EagleProfileBytesAdapter` and persist them, with the speaker's name and creation date, to a JSON file in the Application Support directory.
+7. The profiler is destroyed (`delete()`), the audio engine is stopped, and resources are released. A success haptic fires.
 
 ## How recognition works
 
-1. All saved `SpeakerProfile` records are loaded from disk and reconstituted into `EagleProfile` instances.
-2. `Eagle` is initialized with the array of profiles plus the configured `voiceThreshold` (0.3 by default — Eagle's internal voice activity threshold, distinct from the app-level identification threshold).
+1. All saved `SpeakerProfile` records are loaded from disk and reconstituted into `EagleProfile` instances via `EagleProfileBytesAdapter`.
+2. `Eagle` is initialized with the configured `voiceThreshold` (0.3 by default — Eagle's internal voice activity threshold, distinct from the app-level identification threshold). In the current iOS SDK, `Eagle.init` does **not** take speaker profiles; they are supplied per-call to `process(pcm:speakerProfiles:)`. `EagleRecognitionService` caches the reconstructed profiles internally so the view model never sees that detail.
 3. Microphone audio is captured and converted to mono Int16 PCM at `Eagle.sampleRate`.
-4. Frames of length `Eagle.minProcessSamples()` (`Eagle.frameLength` in current SDKs) are fed to `eagle.process(pcm:)`. The returned scores are aligned to the order of the input profiles.
-5. Recognition smooths the last 3–5 score frames with a moving average to avoid jitter.
-6. The highest-scoring speaker becomes the **best match** if their score is at or above the user-configurable identification threshold (default `0.65`, stored in `UserDefaults`); otherwise the UI shows **Unknown Speaker**.
-7. `eagle.reset()` is called when the user taps **Reset Session**. `eagle.delete()` is called when listening stops.
+4. Frames of length `Eagle.minProcessSamples()` (queried after init) are fed to `eagle.process(pcm:speakerProfiles:)`. The returned scores are aligned to the order of the cached profiles.
+5. Recognition smooths the latest 5 score frames with a moving average (`RecognitionViewModel.smoothingWindow`) to avoid jitter.
+6. The highest-scoring speaker becomes the **best match** if their score is at or above the user-configurable identification threshold (default `0.65`, stored in `UserDefaults`); otherwise the UI shows **Unknown Speaker**. A success haptic fires when the matched speaker changes.
+7. The current Eagle iOS SDK has **no `eagle.reset()` method**, so **Reset Session** discards and re-creates the `Eagle` instance inside `EagleRecognitionService` (preserving the loaded profiles). `eagle.delete()` is called when listening stops.
 
 ## How diarization works
 
@@ -158,10 +166,13 @@ If there are no enrolled profiles, the Eagle stage is skipped entirely and every
 ## Architecture
 
 - **MVVM**. View models are `@MainActor`-isolated and publish state via Combine `@Published` properties.
-- **Services** (`Eagle*Service`, `AudioCaptureService`, `SpeakerProfileStore`, `MicrophonePermissionService`) own all I/O, audio, and SDK lifecycles.
-- **Eagle work runs off the main thread.** `Task.detached(priority: .userInitiated)` hands every frame to a serial dispatch queue inside the Eagle services, then jumps back to the main actor only for state mutation.
-- **Profile bytes serialization** is isolated in `EagleProfileBytesAdapter`. If a future Eagle SDK version renames `getBytes()` / `init(bytes:)`, that file is the only place to update.
-- **Maximum reuse across SDKs.** `AudioCaptureService`, `PCMConverter`, `MicrophonePermissionService`, `EnvironmentLoader`/`AppConfig`, and the SwiftUI components all serve Eagle and Falcon equally. The diarization stack adds one new SDK service (`FalconDiarizationService`), one batch Eagle adapter (`EagleSegmentClassifier`), one model (`DiarizedSegment`), one view model, and one view.
+- **Services** (`Eagle*Service`, `FalconDiarizationService`, `AudioCaptureService`, `SpeakerProfileStore`, `MicrophonePermissionService`) own all I/O, audio, and SDK lifecycles. The Eagle and Falcon services are `@unchecked Sendable` and route every public method through an internal serial `DispatchQueue` so the SDK is never re-entered concurrently.
+- **SDK work runs off the main thread.** The `AudioCaptureService` tap callback hands each PCM frame straight to the SDK service on its own queue, then hops back to the main actor with `Task { @MainActor in … }` to mutate view-model state.
+- **Audio capture safety.** `AudioCaptureService.stop()` does an empty `queue.sync {}` to drain any in-flight frame deliveries before clearing the handler, so callers that read an accumulated buffer immediately after stopping can't race with a late frame.
+- **Profile bytes serialization** is isolated in `EagleProfileBytesAdapter`. If a future Eagle SDK version renames `getBytes()` / `init(profileBytes:)`, that file is the only place to update.
+- **Maximum reuse across SDKs.** `AudioCaptureService`, `PCMConverter`, `MicrophonePermissionService`, `EnvironmentLoader`/`AppConfig`, the SwiftUI components, and the dashboard / navigation chrome all serve Eagle and Falcon equally. The diarization stack adds one new SDK service (`FalconDiarizationService`), one batch Eagle adapter (`EagleSegmentClassifier`), one model (`DiarizedSegment`), one view model, and one view.
+- **Cross-actor PCM accumulation.** Diarization captures audio across phases. The accumulator lives in a small private `CaptureBuffer` class (`@unchecked Sendable`, `NSLock`-guarded) inside `DiarizationViewModel`, so the audio-thread frame handler can append to it without crossing main-actor isolation.
+- **App entry.** `VoiceIDEagleApp` simply shows `DashboardView`; the dashboard's `NavigationStack` hosts a centered toolbar title (`VoiceID` + waveform glyph) and routes to `EnrollmentView`, `RecognitionView`, `DiarizationView`, and `ProfileManagementView`.
 
 ## Privacy
 
@@ -174,11 +185,12 @@ If there are no enrolled profiles, the Eagle stage is skipped entirely and every
 
 | Symptom | Likely cause / fix |
 | --- | --- |
-| App crashes immediately with `Missing PICOVOICE_ACCESS_KEY in .env` | The `.env` file is missing, the key is empty, or the file was not added to **Copy Bundle Resources**. |
-| Status card shows **Eagle SDK · Not configured** | Same as above. The `EnvironmentLoader` could not find a non-empty `PICOVOICE_ACCESS_KEY`. |
-| `Microphone · Denied` | The user denied permission. Send them to **Settings → VoiceID Eagle → Microphone**. |
+| App crashes immediately with `Missing PICOVOICE_ACCESS_KEY in .env` | The `.env` file is missing, the key is empty, or the file was not added to **Copy Bundle Resources**. The non-crashing UI path uses `AppConfig.picovoiceAccessKeyIfPresent` and shows the configuration banner instead. |
+| Status card shows **SDKs · Eagle ✕   Falcon ✕** with a "Configuration required" banner | The `EnvironmentLoader` could not find a non-empty `PICOVOICE_ACCESS_KEY`, or one of the SDKs threw during the startup readiness probe (activation refused / limit reached). The banner shows the underlying error. |
+| Status card shows **Eagle ✓   Falcon ✕** (or vice versa) | One of the two SDK packages is wired up, but the other failed to initialize. Tap the toolbar refresh button to re-probe; if it persists, check the error banner. |
+| `Microphone · Denied` | The user denied permission. Send them to **Settings → VoiceIDEagle → Microphone**. |
 | `Picovoice activation limit reached` | Your AccessKey has exceeded its allowed devices. Generate a new key or upgrade in the Picovoice Console. |
-| Enrollment never reaches 100% | Speak more, in a quieter room. Eagle requires several seconds of clean speech. |
+| Enrollment never reaches 100% | Speak more, in a quieter room. Eagle requires several seconds of clean speech, and the app enforces a `minEnrollmentDurationSec` floor (8 s by default) before completion is allowed. |
 | Recognition scores stay near zero | Confirm the input format conversion is producing audio (check the device's microphone permissions and that another app isn't holding the audio session). |
 | Build error: `cannot find 'Eagle' in scope` | The `Eagle` Swift Package was not added to the target. Re-do **File → Add Packages…**. |
 | Build error: `value of type 'EagleProfile' has no member 'getBytes'` | Your installed Eagle SDK version uses a different serialization API. Update `EagleProfileBytesAdapter.swift` — only that file needs to change. |
@@ -192,11 +204,12 @@ If there are no enrolled profiles, the Eagle stage is skipped entirely and every
 | Setting | Where | Default |
 | --- | --- | --- |
 | `PICOVOICE_ACCESS_KEY` | `.env` (or process environment) | required |
-| Identification threshold | `UserDefaults` key `identificationThreshold`, exposed in the Identify screen slider | `0.65` |
-| Eagle voice threshold | `AppConfig.voiceThreshold` | `0.3` |
-| Smoothing window | `RecognitionViewModel.smoothingWindow` | `5` frames |
+| Identification threshold | `UserDefaults` key `identificationThreshold`, exposed in both the Identify and Diarize screens' sliders | `AppConfig.defaultIdentificationThreshold` — `0.65` |
+| Eagle voice threshold | `AppConfig.voiceThreshold` (passed to both `Eagle.init` and `EagleProfiler.init`) | `0.3` |
+| Minimum enrollment duration | `AppConfig.minEnrollmentDurationSec` | `8` s |
+| Recognition smoothing window | `RecognitionViewModel.smoothingWindow` | `5` frames |
 | Max diarization recording length | `DiarizationViewModel.maxRecordingSec` | `300` s (5 min) |
 
 ## License
 
-This sample app code is provided under the MIT license. The Picovoice Eagle SDK is licensed separately by Picovoice — see the [Picovoice license](https://github.com/Picovoice/eagle).
+This sample app code is provided under the MIT license. The Picovoice [Eagle](https://github.com/Picovoice/eagle) and [Falcon](https://github.com/Picovoice/falcon) SDKs are licensed separately by Picovoice — see each project's `LICENSE` file.
